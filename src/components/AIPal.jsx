@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from './ui/card';
 import { Button } from './ui/button';
+import { Badge } from './ui/badge';
 import { Sparkles, Brain, RefreshCw, Calendar, ListPlus } from 'lucide-react';
 import { toast } from './ui/toast';
 import { generateScheduleWithAI, hasUsableKey, aiAvailable, probeHosted } from '../lib/ai';
@@ -36,6 +37,11 @@ export default function AIPal({ ai, energy = 8, setEnergy, tasks = [], onAdoptSc
     });
 
     const openTasks = tasks.filter((t) => !t.completed).slice(0, 8);
+
+    // probeHosted() caches after its first (mount-time) call, but that fetch may
+    // still be in flight if the user clicks Generate right away — await it here
+    // so a fast click doesn't silently fall back to the local mock schedule.
+    await probeHosted();
 
     if (aiAvailable(ai)) {
       try {
@@ -98,31 +104,36 @@ export default function AIPal({ ai, energy = 8, setEnergy, tasks = [], onAdoptSc
         { time: '09:00 AM', title: 'Desk Cleansing & Calm Workspace Init', type: 'admin' },
         { time: '09:10 AM', title: 'Micro-Sprint: low-friction checklist tasks', type: 'focus' },
         { time: '09:35 AM', title: 'Extended Rest: hydration & fresh air', type: 'break' },
-        { time: '09:55 AM', title: 'Documentation review or low-stress writing', type: 'admin' },
-        { time: '10:15 AM', title: 'Guided physical stretching or quiet breathing', type: 'break' },
+        { time: '09:45 AM', title: 'Light Triage: reply to key messages', type: 'admin' },
+        { time: '10:00 AM', title: 'Wind-down: log progress & clear desk', type: 'admin' },
       ];
     }
 
     setSchedule(plan);
     toast({
-      title: 'Local Roadmap Loaded',
-      description: `Generated schedule based on Energy Level ${energy}/10.`,
-      variant: 'success',
+      title: 'Roadmap Ready',
+      description: `Plan generated locally for energy level ${energy}/10.`,
+      variant: 'info',
     });
   };
 
   const handleReset = () => {
     setSchedule(null);
-    updateGoals('');
-    toast({
-      title: 'State Cleared',
-      description: 'Coach reset. Ready to generate a new path.',
-      variant: 'info',
-    });
   };
 
   const handleAdopt = () => {
-    if (schedule && onAdoptSchedule) onAdoptSchedule(schedule);
+    if (!schedule || !onAdoptSchedule) return;
+    const focusItems = schedule.filter((s) => s.type === 'focus');
+    if (!focusItems.length) {
+      toast({ title: 'No focus slots', description: 'This roadmap has no focus blocks to add.', variant: 'info' });
+      return;
+    }
+    onAdoptSchedule(focusItems);
+    toast({
+      title: 'Schedule Adopted',
+      description: `Added ${focusItems.length} focus block${focusItems.length > 1 ? 's' : ''} to your task board.`,
+      variant: 'success',
+    });
   };
 
   const getTypeColor = (type) => {
@@ -134,12 +145,12 @@ export default function AIPal({ ai, energy = 8, setEnergy, tasks = [], onAdoptSc
     }
   };
 
-  const getBadgeStyle = (type) => {
+  const getBadgeVariant = (type) => {
     switch (type) {
-      case 'focus': return { color: 'var(--color-cyan)', background: 'rgba(0, 242, 254, 0.08)' };
-      case 'break': return { color: 'var(--color-emerald)', background: 'rgba(5, 255, 161, 0.08)' };
-      case 'admin': return { color: 'var(--color-gold)', background: 'rgba(255, 214, 68, 0.08)' };
-      default: return { color: 'var(--text-muted)', background: 'rgba(255, 255, 255, 0.03)' };
+      case 'focus': return 'secondary';
+      case 'break': return 'default';
+      case 'admin': return 'outline';
+      default: return 'default';
     }
   };
 
@@ -252,13 +263,9 @@ export default function AIPal({ ai, energy = 8, setEnergy, tasks = [], onAdoptSc
                   <div style={{ flex: 1, background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: 10, padding: '10px 12px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                       <span style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'monospace' }}>{item.time}</span>
-                      <span style={{
-                        fontSize: 10, padding: '2px 6px', borderRadius: 20, fontWeight: 700,
-                        textTransform: 'uppercase', letterSpacing: '0.5px',
-                        ...getBadgeStyle(item.type),
-                      }}>
+                      <Badge variant={getBadgeVariant(item.type)} style={{ fontSize: 10, padding: '2px 6px', textTransform: 'uppercase' }}>
                         {item.type}
-                      </span>
+                      </Badge>
                     </div>
                     <div style={{ fontSize: 13, fontWeight: 500, color: '#fff' }}>{item.title}</div>
                   </div>

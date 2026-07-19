@@ -1,46 +1,50 @@
-import React from 'react';
+import * as React from "react"
+import { Slider as SliderPrimitive } from "radix-ui"
 
-export function Slider({ 
-  value = [0], 
-  onValueChange, 
-  min = 0, 
-  max = 100, 
-  step = 1, 
-  className = '', 
-  ...props 
+import { cn } from "@/lib/utils"
+
+function Slider({
+  className,
+  defaultValue,
+  value,
+  min = 0,
+  max = 100,
+  ...props
 }) {
-  const val = value[0];
-  const percentage = ((val - min) / (max - min)) * 100;
-
-  const handleChange = (e) => {
-    const newVal = parseFloat(e.target.value);
-    if (onValueChange) {
-      onValueChange([newVal]);
-    }
-  };
+  const _values = React.useMemo(() =>
+    Array.isArray(value)
+      ? value
+      : Array.isArray(defaultValue)
+        ? defaultValue
+        : [min, max], [value, defaultValue, min, max])
 
   return (
-    <div className={`sads-slider-container ${className}`} {...props}>
-      <div className="sads-slider-track-bg"></div>
-      <div 
-        className="sads-slider-track-fill" 
-        style={{ width: `${percentage}%` }}
-      >
-        <div className="sads-slider-glow"></div>
-      </div>
-      <input
-        type="range"
-        min={min}
-        max={max}
-        step={step}
-        value={val}
-        onChange={handleChange}
-        className="sads-slider-input"
-      />
-      <div 
-        className="sads-slider-thumb"
-        style={{ left: `calc(${percentage}% - 6px)` }}
-      />
-    </div>
+    <SliderPrimitive.Root
+      data-slot="slider"
+      defaultValue={defaultValue}
+      value={value}
+      min={min}
+      max={max}
+      className={cn(
+        "relative flex w-full touch-none items-center select-none data-disabled:opacity-50 data-vertical:h-full data-vertical:min-h-40 data-vertical:w-auto data-vertical:flex-col",
+        className
+      )}
+      {...props}>
+      <SliderPrimitive.Track
+        data-slot="slider-track"
+        className="relative grow overflow-hidden rounded-full bg-muted data-horizontal:h-1 data-horizontal:w-full data-vertical:h-full data-vertical:w-1">
+        <SliderPrimitive.Range
+          data-slot="slider-range"
+          className="absolute bg-primary select-none data-horizontal:h-full data-vertical:w-full" />
+      </SliderPrimitive.Track>
+      {Array.from({ length: _values.length }, (_, index) => (
+        <SliderPrimitive.Thumb
+          data-slot="slider-thumb"
+          key={index}
+          className="relative block size-3 shrink-0 rounded-full border border-ring bg-white ring-ring/50 transition-[color,box-shadow] select-none after:absolute after:-inset-2 hover:ring-3 focus-visible:ring-3 focus-visible:outline-hidden active:ring-3 disabled:pointer-events-none disabled:opacity-50" />
+      ))}
+    </SliderPrimitive.Root>
   );
 }
+
+export { Slider }

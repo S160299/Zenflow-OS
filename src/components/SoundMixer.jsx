@@ -3,6 +3,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from './ui/
 import { Slider } from './ui/slider';
 import { Switch } from './ui/switch';
 import { Button } from './ui/button';
+import { Input } from './ui/input';
 import { Volume2, VolumeX, CloudRain, Radio, Compass, Flame, Waves, Wind, Music, Save, X } from 'lucide-react';
 import { toast } from './ui/toast';
 import {
@@ -238,12 +239,11 @@ export default function SoundMixer() {
             </div>
           )}
           <form onSubmit={handleSavePreset} style={{ display: 'flex', gap: 8 }}>
-            <input
+            <Input
               type="text"
               value={presetName}
               onChange={(e) => setPresetName(e.target.value)}
               placeholder="Name this mix (e.g. Deep Work)"
-              className="goals-textarea-premium"
               style={{ margin: 0, height: 32, padding: '0 10px', fontSize: 11, flex: 1 }}
             />
             <Button type="submit" variant="glass" style={{ height: 32, padding: '0 12px', fontSize: 11 }}>

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from './ui/card';
+import { ClockWidget, CalendarWidget, MetricsWidget } from './ui/widget';
 import { BarChart3, Flame, Timer, CheckCircle2, Table2 } from 'lucide-react';
 import { getLastDays, getStreak, getTotals, subscribeStats, dateKey } from '../lib/stats';
 
@@ -81,6 +82,13 @@ export default function StatsApp({ tasks = [] }) {
       </CardHeader>
 
       <CardContent>
+        {/* Wigggle UI Widgets */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14, marginBottom: 20 }}>
+          <ClockWidget />
+          <CalendarWidget />
+          <MetricsWidget focusRounds={totals.sessions} completedTasks={totals.tasksCompleted} />
+        </div>
+
         {/* Stat tiles */}
         <div className="stats-tile-row">
           {tiles.map((tile) => {

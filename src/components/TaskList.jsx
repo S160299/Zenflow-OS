@@ -1,10 +1,16 @@
 import React, { useState } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from './ui/card';
 import { Button } from './ui/button';
+import { Input } from './ui/input';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from './ui/select';
+import { Popover, PopoverTrigger, PopoverContent } from './ui/popover';
+import { Calendar } from './ui/calendar';
+import { Badge } from './ui/badge';
 import {
   ListTodo, Plus, Trash, Check, Crosshair, Pencil,
   GripVertical, CalendarDays, Timer as TimerIcon, Eraser,
 } from 'lucide-react';
+import { format } from 'date-fns';
 import { toast } from './ui/toast';
 import { playChime } from '../lib/audioEngine';
 import { recordTaskCompleted } from '../lib/stats';
@@ -57,7 +63,6 @@ export default function TaskList({ tasks = [], setTasks, onOpenTimer }) {
   };
 
   const handleToggleTask = (id) => {
-    // Side effects stay out of the setState updater (updaters must be pure)
     const task = tasks.find((t) => t.id === id);
     if (!task) return;
     const nextCompleted = !task.completed;
@@ -153,43 +158,48 @@ export default function TaskList({ tasks = [], setTasks, onOpenTimer }) {
             Prioritize, schedule, and clear high-impact focus items
           </CardDescription>
         </div>
-        <span style={{
-          fontSize: 11, fontFamily: 'var(--font-title)', fontWeight: 700,
-          background: 'rgba(5, 255, 161, 0.08)', color: 'var(--color-emerald)',
-          padding: '4px 10px', borderRadius: 20, whiteSpace: 'nowrap',
-        }}>
+        <Badge variant="secondary">
           {completedCount} / {tasks.length} Done
-        </span>
+        </Badge>
       </CardHeader>
 
       <CardContent>
         {/* Add form */}
         <form onSubmit={handleAddTask} className="task-add-form">
-          <input
+          <Input
             type="text"
             placeholder="Add a high-impact focus item..."
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
-            className="goals-textarea-premium task-add-input"
+            className="task-add-input"
             aria-label="New task"
           />
-          <select
-            value={inputPriority}
-            onChange={(e) => setInputPriority(e.target.value)}
-            className="task-add-select"
-            aria-label="Priority"
-          >
-            <option value="high">High</option>
-            <option value="med">Med</option>
-            <option value="low">Low</option>
-          </select>
-          <input
-            type="date"
-            value={inputDue}
-            onChange={(e) => setInputDue(e.target.value)}
-            className="task-add-date"
-            aria-label="Due date"
-          />
+          <Select value={inputPriority} onValueChange={setInputPriority}>
+            <SelectTrigger className="task-add-select" aria-label="Priority">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="high">High</SelectItem>
+              <SelectItem value="med">Med</SelectItem>
+              <SelectItem value="low">Low</SelectItem>
+            </SelectContent>
+          </Select>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button type="button" variant="outline" className="task-add-date" aria-label="Due date">
+                <CalendarDays size={13} style={{ marginRight: 6, flexShrink: 0 }} />
+                {inputDue ? format(new Date(`${inputDue}T00:00:00`), 'MMM d') : 'Due date'}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="start" className="w-auto p-0">
+              <Calendar
+                mode="single"
+                selected={inputDue ? new Date(`${inputDue}T00:00:00`) : undefined}
+                onSelect={(date) => setInputDue(date ? format(date, 'yyyy-MM-dd') : '')}
+                autoFocus
+              />
+            </PopoverContent>
+          </Popover>
           <Button type="submit" variant="neon-cyan" style={{ height: 38, width: 44, padding: 0 }} aria-label="Add task">
             <Plus size={18} />
           </Button>

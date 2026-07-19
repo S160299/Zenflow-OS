@@ -4,6 +4,9 @@ import SoundMixer from './components/SoundMixer';
 import TaskList from './components/TaskList';
 import AIPal from './components/AIPal';
 import StatsApp from './components/StatsApp';
+import {
+  CoachSummaryCard, TimerSummaryCard, SynthSummaryCard, TasksSummaryCard, StatsSummaryCard,
+} from './components/overview/OverviewCards';
 import CommandPalette from './components/CommandPalette';
 import ErrorBoundary from './components/ErrorBoundary';
 import { ToastProvider, toast } from './components/ui/toast';
@@ -14,16 +17,16 @@ import { PROVIDERS, hasUsableKey } from './lib/ai';
 import { SOUND_DEFS, toggleTrack, isActive as isSoundActive, subscribe as subscribeAudio } from './lib/audioEngine';
 import {
   Sparkles, Brain, Timer, Volume2, ListTodo,
-  Settings, Grid, KeyRound, CheckCircle2, ChevronDown,
+  Settings, Grid, KeyRound, CheckCircle2,
   BarChart3, Command, Play, Pause, SkipForward, RotateCcw, Music,
 } from 'lucide-react';
 
 const APPS = [
-  { id: 'aipal', title: 'AI Focus Coach', short: 'Coach', sub: 'Roadmap', icon: Brain, color: 'var(--color-gold)' },
-  { id: 'wavetimer', title: 'Wave Focus Timer', short: 'Timer', sub: 'Wave Flow', icon: Timer, color: 'var(--color-cyan)' },
-  { id: 'soundboard', title: 'Procedural Audio Mixer', short: 'Synth', sub: 'Synth Mixer', icon: Volume2, color: 'var(--color-purple)' },
-  { id: 'tasks', title: 'Holographic Task Board', short: 'Tasks', sub: null, icon: ListTodo, color: 'var(--color-emerald)' },
-  { id: 'stats', title: 'Focus Statistics', short: 'Stats', sub: 'Insights', icon: BarChart3, color: 'var(--color-blue)' },
+  { id: 'aipal', title: 'AI Focus Coach', short: 'Coach', icon: Brain, color: 'var(--color-gold)' },
+  { id: 'wavetimer', title: 'Wave Focus Timer', short: 'Timer', icon: Timer, color: 'var(--color-cyan)' },
+  { id: 'soundboard', title: 'Procedural Audio Mixer', short: 'Synth', icon: Volume2, color: 'var(--color-purple)' },
+  { id: 'tasks', title: 'Holographic Task Board', short: 'Tasks', icon: ListTodo, color: 'var(--color-emerald)' },
+  { id: 'stats', title: 'Focus Statistics', short: 'Stats', icon: BarChart3, color: 'var(--color-blue)' },
 ];
 
 const ACCENTS = [
@@ -99,8 +102,6 @@ function AppContent({ tasks, setTasks }) {
   const [energyLevel, setEnergyLevelRaw] = useState(() => loadJSON('zenflow_energy', 8));
   const [showControlDrawer, setShowControlDrawer] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
-  const [windowFull, setWindowFull] = useState(false);
-  const [winOffset, setWinOffset] = useState({ x: 0, y: 0 });
 
   // Appearance settings
   const [accent, setAccent] = useState(() => loadString('zenflow_accent', 'cyan'));
@@ -141,9 +142,6 @@ function AppContent({ tasks, setTasks }) {
   // Re-render the command palette labels when sound tracks start/stop
   const [soundTick, setSoundTick] = useState(0);
   useEffect(() => subscribeAudio(() => setSoundTick((t) => t + 1)), []);
-
-  // Reset window drag offset when the focused app or layout changes
-  useEffect(() => setWinOffset({ x: 0, y: 0 }), [activeApp, viewMode, windowFull]);
 
   const handleApiKeyChange = (e) => {
     const key = e.target.value.trim();
@@ -192,25 +190,6 @@ function AppContent({ tasks, setTasks }) {
     });
   }, [setTasks]);
 
-  // Window dragging (stage mode title bar)
-  const dragOriginRef = useRef(null);
-  const handleTitleBarPointerDown = (e) => {
-    if (e.target.closest('.traffic-light')) return;
-    e.preventDefault();
-    dragOriginRef.current = { x: e.clientX - winOffset.x, y: e.clientY - winOffset.y };
-    const move = (ev) => {
-      const o = dragOriginRef.current;
-      if (o) setWinOffset({ x: ev.clientX - o.x, y: ev.clientY - o.y });
-    };
-    const up = () => {
-      dragOriginRef.current = null;
-      window.removeEventListener('pointermove', move);
-      window.removeEventListener('pointerup', up);
-    };
-    window.addEventListener('pointermove', move);
-    window.addEventListener('pointerup', up);
-  };
-
   // Command palette actions
   const commands = useMemo(() => {
     // soundTick ties this memo to audio-engine state, keeping Play/Stop labels fresh
@@ -233,7 +212,7 @@ function AppContent({ tasks, setTasks }) {
       ...appCommands,
       {
         id: 'toggle-view',
-        label: viewMode === 'stage' ? 'Switch to Widget Grid' : 'Switch to Stage Manager',
+        label: viewMode === 'stage' ? 'Switch to Overview' : 'Switch to Focus View',
         hint: 'G',
         icon: Grid,
         action: () => setViewMode(viewMode === 'stage' ? 'grid' : 'stage'),
@@ -315,61 +294,86 @@ function AppContent({ tasks, setTasks }) {
 
   return (
     <>
-      {/* Top Status Bar */}
-      <header className="macos-status-bar">
-        <div className="status-bar-left">
-          <button
-            className="brand-logo"
-            onClick={() => setViewMode(viewMode === 'stage' ? 'grid' : 'stage')}
-            title="Toggle desktop mode (G)"
-          >
-            <Sparkles size={15} style={{ color: 'var(--color-cyan)' }} />
-            <span>Zenflow OS</span>
-          </button>
-          <span className="menu-item font-semibold active-app-title" style={{ color: '#fff' }}>
-            {activeAppDef.title}
-          </span>
-          <button className="menu-item" onClick={() => setViewMode('stage')}>Stage Manager</button>
-          <button className="menu-item" onClick={() => setViewMode('grid')}>Widget Grid</button>
-          <button
-            className="menu-item cmdk-hint"
-            onClick={() => setPaletteOpen(true)}
-            title="Command palette"
-          >
-            <Command size={11} style={{ marginRight: 3 }} />K
-          </button>
-        </div>
-
-        <div className="status-bar-right">
-          {/* Live timer chip */}
-          <TimerChip onOpen={() => openApp('wavetimer')} />
-
-          <div className="status-bar-stat" title="Task completion">
-            <CheckCircle2 size={13} style={{ color: 'var(--color-emerald)' }} />
-            <span>{completedCount}/{tasks.length} Done</span>
+      <div className="app-shell">
+        {/* Left Sidebar Navigation */}
+        <aside className="app-sidebar">
+          <div className="sidebar-brand">
+            <Sparkles size={18} style={{ color: 'var(--color-cyan)' }} />
+            <span>Zenflow</span>
           </div>
 
-          <div className="status-bar-stat hide-on-small" title="Cognitive energy reservoir">
-            <Sparkles size={13} style={{ color: 'var(--color-gold)' }} />
-            <span>Energy: {energyLevel * 10}%</span>
+          <nav className="sidebar-nav">
+            {APPS.map((app) => {
+              const Icon = app.icon;
+              const active = activeApp === app.id && viewMode === 'stage';
+              return (
+                <button
+                  key={app.id}
+                  className={`sidebar-nav-item ${active ? 'active' : ''}`}
+                  onClick={() => openApp(app.id)}
+                >
+                  <Icon size={18} style={{ color: app.color }} />
+                  <span>{app.short}</span>
+                  {app.id === 'tasks' && <span className="sidebar-nav-badge">{completedCount}</span>}
+                </button>
+              );
+            })}
+            <button
+              className={`sidebar-nav-item ${viewMode === 'grid' ? 'active' : ''}`}
+              onClick={() => setViewMode('grid')}
+            >
+              <Grid size={18} />
+              <span>Overview</span>
+            </button>
+          </nav>
+
+          <div className="sidebar-footer">
+            <button
+              className={`sidebar-nav-item ${showControlDrawer ? 'active' : ''}`}
+              onClick={() => setShowControlDrawer(!showControlDrawer)}
+              aria-expanded={showControlDrawer}
+            >
+              <Settings size={18} />
+              <span>Settings</span>
+            </button>
           </div>
+        </aside>
 
-          <Clock />
+        <div className="app-main-column">
+          {/* Top Bar */}
+          <header className="app-topbar">
+            <div className="topbar-left">
+              <span className="topbar-title">
+                {viewMode === 'stage' ? activeAppDef.title : 'Overview'}
+              </span>
+              <button
+                className="status-bar-stat cmdk-hint"
+                onClick={() => setPaletteOpen(true)}
+                title="Command palette"
+              >
+                <Command size={11} style={{ marginRight: 3 }} />K
+              </button>
+            </div>
 
-          <button
-            className="settings-toggle"
-            onClick={() => setShowControlDrawer(!showControlDrawer)}
-            title="System settings"
-            aria-expanded={showControlDrawer}
-          >
-            <Settings size={15} style={{ color: showControlDrawer ? 'var(--color-cyan)' : 'var(--text-secondary)' }} />
-            <ChevronDown size={10} style={{ marginLeft: 3, opacity: 0.5 }} />
-          </button>
-        </div>
-      </header>
+            <div className="topbar-right">
+              <TimerChip onOpen={() => openApp('wavetimer')} />
 
-      {/* Control Center Drawer */}
-      {showControlDrawer && (
+              <div className="status-bar-stat" title="Task completion">
+                <CheckCircle2 size={13} style={{ color: 'var(--color-emerald)' }} />
+                <span>{completedCount}/{tasks.length} Done</span>
+              </div>
+
+              <div className="status-bar-stat hide-on-small" title="Cognitive energy reservoir">
+                <Sparkles size={13} style={{ color: 'var(--color-gold)' }} />
+                <span>Energy: {energyLevel * 10}%</span>
+              </div>
+
+              <Clock />
+            </div>
+          </header>
+
+          {/* Control Center Drawer */}
+          {showControlDrawer && (
         <div className="control-drawer">
           <div className="drawer-row" style={{ borderBottom: '0.5px solid rgba(255,255,255,0.06)', paddingBottom: 10, marginBottom: 14 }}>
             <span className="drawer-label" style={{ fontWeight: 700, color: '#fff' }}>SYSTEM PREFERENCES</span>
@@ -473,111 +477,22 @@ function AppContent({ tasks, setTasks }) {
         </div>
       )}
 
-      {/* Desktop Main Frame */}
-      <main className="macos-desktop">
-        {viewMode === 'stage' ? (
-          <div className={`stage-manager-layout ${windowFull ? 'window-full' : ''}`}>
-            <aside className="stage-thumbnails">
-              {APPS.map((app) => {
-                const Icon = app.icon;
-                return (
-                  <button
-                    key={app.id}
-                    className={`stage-thumbnail-card ${activeApp === app.id ? 'active-focus' : ''}`}
-                    onClick={() => setActiveApp(app.id)}
-                  >
-                    <div className="stage-thumbnail-header">
-                      <Icon size={10} style={{ color: app.color }} />
-                      <span>{app.short}</span>
-                    </div>
-                    <div className="stage-thumbnail-body">
-                      {app.id === 'tasks' ? `${completedCount}/${tasks.length} Completed` : app.sub}
-                    </div>
-                  </button>
-                );
-              })}
-            </aside>
-
-            <section className="stage-active-viewport">
-              <div
-                className="macos-window"
-                style={winOffset.x || winOffset.y ? { transform: `translate(${winOffset.x}px, ${winOffset.y}px)` } : undefined}
-              >
-                <div
-                  className="window-title-bar"
-                  onPointerDown={handleTitleBarPointerDown}
-                  style={{ cursor: 'grab', touchAction: 'none' }}
-                >
-                  <div className="window-traffic-lights">
-                    <button
-                      className="traffic-light traffic-light-close"
-                      onClick={() => setViewMode('grid')}
-                      title="Close window (back to dashboard)"
-                    />
-                    <button
-                      className="traffic-light traffic-light-min"
-                      onClick={() => setWindowFull(false)}
-                      title="Restore window size"
-                    />
-                    <button
-                      className="traffic-light traffic-light-max"
-                      onClick={() => setWindowFull(!windowFull)}
-                      title={windowFull ? 'Exit full screen' : 'Full screen'}
-                    />
-                  </div>
-                  <div className="window-title">{activeAppDef.title}</div>
-                  <div className="window-actions" />
-                </div>
-
-                <div className="window-body">
-                  {renderApp(activeApp)}
-                </div>
+          {/* Content */}
+          <main className="app-content">
+            {viewMode === 'stage' ? (
+              <div className="app-content-single">{renderApp(activeApp)}</div>
+            ) : (
+              <div className="tiled-widget-grid overview-grid">
+                <div className="widget-w4"><CoachSummaryCard energy={energyLevel} onOpen={() => openApp('aipal')} /></div>
+                <div className="widget-w4"><TimerSummaryCard onOpen={() => openApp('wavetimer')} /></div>
+                <div className="widget-w4"><SynthSummaryCard onOpen={() => openApp('soundboard')} /></div>
+                <div className="widget-w4"><TasksSummaryCard tasks={tasks} onOpen={() => openApp('tasks')} /></div>
+                <div className="widget-w4"><StatsSummaryCard onOpen={() => openApp('stats')} /></div>
               </div>
-            </section>
-          </div>
-        ) : (
-          <div className="tiled-widget-grid">
-            <div className="widget-w4">{renderApp('aipal')}</div>
-            <div className="widget-w4">{renderApp('wavetimer')}</div>
-            <div className="widget-w4">{renderApp('soundboard')}</div>
-            <div className="widget-w4">{renderApp('tasks')}</div>
-            <div className="widget-w4">{renderApp('stats')}</div>
-          </div>
-        )}
-      </main>
-
-      {/* Bottom Dock */}
-      <footer className="macos-dock-container">
-        <div className="macos-dock">
-          {APPS.map((app) => {
-            const Icon = app.icon;
-            return (
-              <button
-                key={app.id}
-                className={`dock-item ${activeApp === app.id && viewMode === 'stage' ? 'active' : ''}`}
-                onClick={() => openApp(app.id)}
-                aria-label={app.title}
-              >
-                <Icon size={24} style={{ color: app.color }} />
-                <span className="dock-tooltip">
-                  {app.id === 'tasks' ? `Tasks (${completedCount})` : app.short}
-                </span>
-              </button>
-            );
-          })}
-
-          <div className="dock-divider" />
-
-          <button
-            className={`dock-item ${viewMode === 'grid' ? 'active' : ''}`}
-            onClick={() => setViewMode('grid')}
-            aria-label="Widget grid"
-          >
-            <Grid size={24} style={{ color: '#fff' }} />
-            <span className="dock-tooltip">Widget Grid</span>
-          </button>
+            )}
+          </main>
         </div>
-      </footer>
+      </div>
 
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} commands={commands} />
     </>
