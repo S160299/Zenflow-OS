@@ -56,7 +56,7 @@ export default function AIPal({ ai, energy = 8, setEnergy, tasks = [], onAdoptSc
         setSchedule(plan);
         toast({
           title: 'Focus Roadmap Generated',
-          description: `Plan built by ${hasUsableKey(ai?.provider, ai?.apiKey) ? 'GPT' : 'Zenflow Cloud AI'} around your open tasks.`,
+          description: `Plan built by ${providerLabel} around your open tasks.`,
           variant: 'success',
         });
       } catch (err) {
@@ -155,8 +155,9 @@ export default function AIPal({ ai, energy = 8, setEnergy, tasks = [], onAdoptSc
   };
 
   const usingOwnKey = hasUsableKey(ai?.provider, ai?.apiKey);
+  const OWN_KEY_LABELS = { openai: 'GPT', gemini: 'Gemini', groq: 'Llama' };
   const providerLabel = usingOwnKey
-    ? 'GPT'
+    ? (OWN_KEY_LABELS[ai?.provider] || 'AI')
     : 'Zenflow Cloud AI';
   const usingAI = aiAvailable(ai);
 

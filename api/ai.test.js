@@ -10,6 +10,8 @@ function mockRes() {
 
 beforeEach(() => {
   delete process.env.OPENAI_API_KEY;
+  delete process.env.GEMINI_API_KEY;
+  delete process.env.GROQ_API_KEY;
 });
 
 afterEach(() => vi.unstubAllGlobals());
@@ -67,7 +69,21 @@ describe('/api/ai handler', () => {
     expect(res.body).toEqual({ text: 'proxied answer' });
   });
 
-  it('maps upstream failures to 502', async () => {
+  it('prefers Gemini over OpenAI when both keys are configured', async () => {
+    process.env.GEMINI_API_KEY = 'AIza-test';
+    process.env.OPENAI_API_KEY = 'sk-test';
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ choices: [{ message: { content: 'gemini answer' } }] }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const res = mockRes();
+    await handler({ method: 'POST', body: { prompt: 'hello' } }, res);
+    expect(res.body).toEqual({ text: 'gemini answer' });
+    expect(fetchMock.mock.calls[0][0]).toContain('generativelanguage.googleapis.com');
+  });
+
+  it('maps upstream failures to 502 when no provider succeeds', async () => {
     process.env.OPENAI_API_KEY = 'sk-test';
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
       ok: false,
@@ -78,5 +94,21 @@ describe('/api/ai handler', () => {
     await handler({ method: 'POST', body: { prompt: 'hello' } }, res);
     expect(res.statusCode).toBe(502);
     expect(res.body.error).toContain('429');
+  });
+
+  it('falls through to the next provider when the first one fails', async () => {
+    process.env.GEMINI_API_KEY = 'AIza-test';
+    process.env.GROQ_API_KEY = 'gsk_test';
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({ ok: false, status: 503, text: async () => 'high demand' })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ choices: [{ message: { content: 'groq answer' } }] }) });
+    vi.stubGlobal('fetch', fetchMock);
+    const res = mockRes();
+    await handler({ method: 'POST', body: { prompt: 'hello' } }, res);
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toEqual({ text: 'groq answer' });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls[0][0]).toContain('generativelanguage.googleapis.com');
+    expect(fetchMock.mock.calls[1][0]).toContain('api.groq.com');
   });
 });

@@ -3,7 +3,19 @@
 
 export const PROVIDERS = [
   { id: 'openai', label: 'OpenAI (GPT)', keyPlaceholder: 'sk-...' },
+  { id: 'gemini', label: 'Google Gemini', keyPlaceholder: 'AIza...' },
+  { id: 'groq', label: 'Groq (Llama)', keyPlaceholder: 'gsk_...' },
 ];
+
+// Each provider's chat-completions endpoint is OpenAI-compatible, so one
+// request builder (below) serves all of them — only the base URL/model differ.
+// Gemini uses Google's OpenAI-compatibility layer (generativelanguage.googleapis.com/v1beta/openai)
+// rather than its native API, so it can share the same request shape.
+const PROVIDER_CONFIG = {
+  openai: { baseUrl: 'https://api.openai.com/v1/chat/completions', model: 'gpt-4o-mini' },
+  gemini: { baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', model: 'gemini-2.5-flash' },
+  groq: { baseUrl: 'https://api.groq.com/openai/v1/chat/completions', model: 'llama-3.3-70b-versatile' },
+};
 
 /* ---------------- Hosted proxy (/api/ai) ---------------- */
 // When the app is deployed with a server-side key, judges/visitors get
@@ -47,7 +59,11 @@ export function aiAvailable(ai) {
 }
 
 export function hasUsableKey(provider, key) {
-  return provider === 'openai' && Boolean(key) && key.startsWith('sk-');
+  if (!key) return false;
+  if (provider === 'openai') return key.startsWith('sk-');
+  if (provider === 'gemini') return key.startsWith('AIza');
+  if (provider === 'groq') return key.startsWith('gsk_');
+  return false;
 }
 
 function schedulePrompt({ energy, goals, tasks }) {
@@ -77,21 +93,24 @@ export function extractJSON(text) {
   return JSON.parse(cleaned);
 }
 
-/* ---------------- OpenAI ---------------- */
+/* ---------------- Direct provider call (personal key) ---------------- */
 
-async function openaiChat({ apiKey, system, prompt, json = false }) {
+async function directChat({ provider, apiKey, system, prompt, json = false }) {
+  const config = PROVIDER_CONFIG[provider];
+  if (!config) throw new Error(`Unknown AI provider: ${provider}`);
+
   const messages = [];
   if (system) messages.push({ role: 'system', content: system });
   messages.push({ role: 'user', content: prompt });
 
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+  const response = await fetch(config.baseUrl, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
-      model: 'gpt-4o-mini',
+      model: config.model,
       messages,
       temperature: 0.7,
       ...(json ? { response_format: { type: 'json_object' } } : {}),
@@ -100,12 +119,12 @@ async function openaiChat({ apiKey, system, prompt, json = false }) {
 
   if (!response.ok) {
     const detail = await response.text().catch(() => '');
-    throw new Error(`OpenAI request failed (${response.status}): ${detail.slice(0, 200)}`);
+    throw new Error(`${provider} request failed (${response.status}): ${detail.slice(0, 200)}`);
   }
 
   const data = await response.json();
   const content = data.choices?.[0]?.message?.content;
-  if (!content) throw new Error('OpenAI returned an empty response');
+  if (!content) throw new Error(`${provider} returned an empty response`);
   return content;
 }
 
@@ -123,7 +142,8 @@ export async function generateScheduleWithAI({ provider, apiKey, energy, goals, 
     return extractJSON(text).schedule;
   }
 
-  const content = await openaiChat({
+  const content = await directChat({
+    provider,
     apiKey,
     prompt: `${prompt}\n\nRespond ONLY with a JSON object of the form {"schedule": [...]} — no markdown, no backticks.`,
     json: true,
@@ -137,5 +157,5 @@ export async function chatWithAI({ provider, apiKey, system, prompt }) {
     return hostedChat({ system, prompt });
   }
 
-  return openaiChat({ apiKey, system, prompt });
+  return directChat({ provider, apiKey, system, prompt });
 }

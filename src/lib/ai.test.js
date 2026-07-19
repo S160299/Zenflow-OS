@@ -15,6 +15,10 @@ describe('hasUsableKey', () => {
     const { hasUsableKey } = await freshAI();
     expect(hasUsableKey('openai', 'sk-abc')).toBe(true);
     expect(hasUsableKey('openai', '')).toBe(false);
+    expect(hasUsableKey('gemini', 'AIzaSyAbc')).toBe(true);
+    expect(hasUsableKey('gemini', 'sk-abc')).toBe(false);
+    expect(hasUsableKey('groq', 'gsk_abc')).toBe(true);
+    expect(hasUsableKey('groq', 'sk-abc')).toBe(false);
     expect(hasUsableKey('unknown', 'sk-abc')).toBe(false);
   });
 });
